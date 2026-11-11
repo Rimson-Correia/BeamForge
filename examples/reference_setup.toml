@@ -1,0 +1,31 @@
+# Reference optics from SPEC.md section 5. The power, repetition rate, pulse
+# duration and scan speed are arbitrary round numbers for illustration only.
+
+[laser]
+wavelength_nm = 800
+rep_rate_hz = 1000
+pulse_duration_fs = 100          # FWHM
+pulse_shape = "gaussian"         # gaussian | sech2 | rectangular
+
+[energy]
+# Give one of: average_power_w, pulse_energy_j, target_peak_fluence_j_cm2
+average_power_w = 1.0
+measured = "before_aperture"     # before_aperture | after_aperture
+transmissions = [0.95]           # each element between that point and the target
+
+[beam]
+model = "truncated_gaussian"     # gaussian | truncated_gaussian | airy | flat_top
+diameter_mm = 10
+diameter_definition = "1/e2"     # 1/e2 | fwhm
+# m2 = 1.0                       # gaussian model only
+# flat_top_diameter_um = 100     # flat_top model only
+
+[aperture]
+diameter_mm = 5
+
+[focusing]
+focal_length_mm = 350
+# defocus_mm = 0                 # gaussian model only
+
+[scanning]
+speed_mm_s = 10
