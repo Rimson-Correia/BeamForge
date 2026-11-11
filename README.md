@@ -53,6 +53,41 @@ To go from a wanted fluence to the required energy and power, give
 `target_peak_fluence` (`target_peak_fluence_j_cm2` in the file) instead of a
 power.
 
+## Desktop application
+
+![BeamForge main window](docs/screenshot.png)
+
+The desktop application shows the inputs, the focal profile (linear or
+logarithmic, and as a 2-D spot), the headline numbers and the full results table
+with definitions, assumptions and warnings. Results update as you type. Setups
+can be opened and saved as the same TOML files the command line uses, and
+results exported as CSV or as a text report.
+
+Run it from source:
+
+```bash
+pip install -e ".[gui]"
+```
+
+```bash
+beamforge-gui examples/reference_setup.toml
+```
+
+Build a standalone `dist\BeamForge.exe` for Windows (no Python needed to run it):
+
+```bash
+pip install -e ".[gui,build]"
+```
+
+```bash
+powershell -ExecutionPolicy Bypass -File packaging\build_exe.ps1
+```
+
+The interface contains no physics. It builds the same input structure as a setup
+file and calls the library, so the GUI, the command line and Python give
+identical numbers. It uses PySide6 (Qt) and pyqtgraph, which are optional
+dependencies; the library itself needs only numpy and scipy.
+
 ## Beam models
 
 | `model` | Class | Needs |
