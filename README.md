@@ -118,3 +118,9 @@ pytest
 
 The tests cover the SPEC.md section 5 validation table, the T → 0 and T → ∞
 limits of the truncated Gaussian, and analytic values for every other model.
+
+## Use of AI
+
+Parts of this code, its tests and its documentation were generated with an AI
+coding tool and reviewed by the author, who is responsible for the content.
+[AI_USAGE.md](AI_USAGE.md) logs what was generated and with which tool.
