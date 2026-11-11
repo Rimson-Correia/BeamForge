@@ -340,6 +340,16 @@ class FlatTopSpot(Spot):
         return min(1.0, (2.0 * radius / self.diameter) ** 2)
 
 
+def sample_profile(spot: Spot, points: int = 200, extent: float = 3.0):
+    """Sample I / I_max on ``points`` radii from 0 to ``extent`` x the 1/e^2 radius.
+
+    Returns ``(radii, values)`` as arrays, for plotting. No physics beyond
+    evaluating ``spot.profile``.
+    """
+    radii = np.linspace(0.0, extent * spot.radius_1e2, points)
+    return radii, np.asarray(spot.profile(radii), dtype=float)
+
+
 def edge_intensity(truncation_ratio: float) -> float:
     """Intensity at the aperture edge relative to the beam centre: exp(-2 T^2).
 

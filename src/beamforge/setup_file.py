@@ -6,6 +6,7 @@ Every key carries its unit in its name, e.g. ``wavelength_nm``. See
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ _SCALARS = {
     ("laser", "pulse_duration_fs"): ("pulse_duration", 1e-15),
     ("energy", "average_power_w"): ("average_power", 1.0),
     ("energy", "pulse_energy_j"): ("pulse_energy", 1.0),
+    ("energy", "pulse_energy_uj"): ("pulse_energy", 1e-6),
     ("energy", "target_peak_fluence_j_cm2"): ("target_peak_fluence", 1e4),
     ("beam", "m2"): ("m2", 1.0),
     ("beam", "flat_top_diameter_um"): ("flat_top_diameter", 1e-6),
@@ -46,6 +48,9 @@ _OTHER = {
 def setup_from_dict(data: dict[str, Any]) -> Setup:
     """Build a :class:`Setup` from the parsed TOML structure. Unknown keys are errors."""
     fields: dict[str, Any] = {}
+    energy_keys = data.get("energy", {})
+    if "pulse_energy_j" in energy_keys and "pulse_energy_uj" in energy_keys:
+        raise ValueError("give only one of pulse_energy_j, pulse_energy_uj")
     for section, content in data.items():
         for key, value in content.items():
             if (section, key) in _SCALARS:
@@ -74,7 +79,32 @@ def setup_from_dict(data: dict[str, Any]) -> Setup:
     return Setup(**fields)
 
 
+def load_dict(path: str | Path) -> dict[str, Any]:
+    """Read a TOML setup file into its plain section/key structure."""
+    with open(path, "rb") as handle:
+        return tomllib.load(handle)
+
+
 def load_setup(path: str | Path) -> Setup:
     """Read a TOML setup file."""
-    with open(path, "rb") as handle:
-        return setup_from_dict(tomllib.load(handle))
+    return setup_from_dict(load_dict(path))
+
+
+def _toml_value(value: Any) -> str:
+    if isinstance(value, str):
+        return json.dumps(value)
+    if isinstance(value, (list, tuple)):
+        return "[" + ", ".join(_toml_value(v) for v in value) + "]"
+    return repr(value)
+
+
+def dumps(data: dict[str, Any]) -> str:
+    """Write the section/key structure back as TOML text (strings, numbers, lists)."""
+    lines: list[str] = []
+    for section, content in data.items():
+        if not content:
+            continue
+        lines.append(f"[{section}]")
+        lines += [f"{key} = {_toml_value(value)}" for key, value in content.items()]
+        lines.append("")
+    return "\n".join(lines)
