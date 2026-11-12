@@ -61,7 +61,8 @@ The desktop application shows the inputs, the focal profile (linear or
 logarithmic, and as a 2-D spot), the headline numbers and the full results table
 with definitions, assumptions and warnings. Results update as you type. Setups
 can be opened and saved as the same TOML files the command line uses, and
-results exported as CSV or as a text report.
+results exported as CSV or as a text report. A short start-up screen is shown
+first; `--no-splash` skips it.
 
 Run it from source:
 

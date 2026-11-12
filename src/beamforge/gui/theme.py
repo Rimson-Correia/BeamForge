@@ -121,12 +121,11 @@ QCheckBox::indicator:checked, QGroupBox::indicator:checked {{
     )
 
 
-def app_icon() -> QIcon:
-    """Draw the application icon: a beam converging to a bright focus."""
-    pixmap = QPixmap(256, 256)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+def draw_logo(painter: QPainter, rect: QRectF) -> None:
+    """Draw the logo, a beam converging to a bright focus, inside a square ``rect``."""
+    painter.save()
+    painter.translate(rect.topLeft())
+    painter.scale(rect.width() / 256, rect.height() / 256)
     gradient = QLinearGradient(0, 0, 256, 256)
     gradient.setColorAt(0.0, QColor(ACCENT_DARK))
     gradient.setColorAt(1.0, QColor(ACCENT))
@@ -139,5 +138,15 @@ def app_icon() -> QIcon:
     painter.drawEllipse(QPointF(186, 128), 36, 36)
     painter.setBrush(QColor(255, 255, 255))
     painter.drawEllipse(QPointF(186, 128), 17, 17)
+    painter.restore()
+
+
+def app_icon() -> QIcon:
+    """The application icon."""
+    pixmap = QPixmap(256, 256)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    draw_logo(painter, QRectF(0, 0, 256, 256))
     painter.end()
     return QIcon(pixmap)

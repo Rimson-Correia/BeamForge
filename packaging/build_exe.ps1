@@ -19,14 +19,17 @@ New-Item -ItemType Directory -Force $WorkDir | Out-Null
 $icon = Join-Path (Resolve-Path $WorkDir) "beamforge.ico"
 
 $env:PYTHONPATH = Join-Path $root "src"
-$env:QT_QPA_PLATFORM = "offscreen"
 & $Python packaging\make_icon.py $icon
 if ($LASTEXITCODE -ne 0) { throw "icon generation failed" }
-Remove-Item Env:QT_QPA_PLATFORM
+# Still picture shown while the exe unpacks; the animated screen takes over after.
+# It needs the system fonts, so Qt must not run in "offscreen" mode here.
+$splash = Join-Path (Resolve-Path $WorkDir) "beamforge_splash.png"
+& $Python packaging\make_splash.py $splash
+if ($LASTEXITCODE -ne 0) { throw "start-up picture generation failed" }
 
 # Qt modules the application does not use; leaving them out keeps the file small.
 $exclude = @(
-    "tkinter", "matplotlib", "IPython", "pytest",
+    "matplotlib", "IPython", "pytest",
     "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.QtWebEngineQuick",
     "PySide6.QtQml", "PySide6.QtQuick", "PySide6.QtQuick3D", "PySide6.QtQuickWidgets",
     "PySide6.QtMultimedia", "PySide6.QtMultimediaWidgets", "PySide6.Qt3DCore",
@@ -38,7 +41,7 @@ $exclude = @(
 $excludeArgs = $exclude | ForEach-Object { "--exclude-module"; $_ }
 
 & $Python -m PyInstaller --noconfirm --clean --onefile --windowed `
-    --name BeamForge --icon $icon --paths src `
+    --name BeamForge --icon $icon --splash $splash --paths src `
     --distpath dist --workpath $WorkDir --specpath $WorkDir `
     @excludeArgs packaging\beamforge_gui.py
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }

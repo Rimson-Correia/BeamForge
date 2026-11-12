@@ -12,6 +12,7 @@ pytest.importorskip("pyqtgraph")
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from beamforge.calculator import calculate  # noqa: E402
+from beamforge.gui import splash  # noqa: E402
 from beamforge.gui.main_window import MainWindow, format_number  # noqa: E402
 from beamforge.setup_file import dumps, load_dict, setup_from_dict  # noqa: E402
 
@@ -99,3 +100,18 @@ def test_format_number():
     assert format_number(8.7491e13) == "8.749 × 10¹³"
     assert format_number(3.5e-7) == "3.500 × 10⁻⁷"
     assert format_number(0.0) == "0"
+
+
+def test_splash_draws_still_and_animated(app):
+    still = splash.still_image()
+    assert (still.width(), still.height()) == (splash.WIDTH, splash.HEIGHT)
+    widget = splash.Splash()
+    frame = widget.grab().toImage()
+    widget.close()
+    assert frame.width() == splash.WIDTH
+    # the loading bar is the only difference between the two pictures
+    row = int(splash.TRACK.center().y())
+    assert any(
+        frame.pixel(x, row) != still.pixel(x, row)
+        for x in range(int(splash.TRACK.left()), int(splash.TRACK.right()))
+    )
