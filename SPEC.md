@@ -1,6 +1,6 @@
 # Specification
 
-Working title: to be chosen (check the name is free on PyPI and GitHub).
+Working title: BeamForge
 
 ## 1. Scope
 
