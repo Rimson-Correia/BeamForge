@@ -88,27 +88,7 @@ lists its own assumptions in the output.
 of named inputs, first-order (`propagate_first_order`) or by Monte Carlo
 (`propagate_monte_carlo`). It is not yet wired into the setup file.
 
-## Design decisions
 
-These choices are not fixed by SPEC.md. The author reviewed and accepted them
-on 2026-11-11:
-
-1. Defocus is implemented for the Gaussian model only, w(z) = w₀√(1+(z/z_R)²).
-   The diffraction models reject a non-zero defocus.
-2. The truncated-Gaussian model accepts M² = 1 only.
-3. For non-Gaussian profiles the "1/e² disc" is the disc whose radius is where
-   I/I_max first falls to e⁻²; the Gaussian-equivalent fluence uses that radius.
-4. Energy measured `before_aperture` is multiplied by 1 − exp(−2T²) for the
-   truncated-Gaussian model only. The Airy model requires `after_aperture`.
-5. Model-mismatch warnings: Gaussian model with T = a/w < 2.3 (Siegman's 4.6w
-   aperture criterion); Airy model with edge intensity below 80 % of centre.
-6. Measured-profile FWHM uses linearly interpolated half-maximum crossings on
-   the row and column through the brightest pixel, not a model fit. I_max is
-   the brightest pixel.
-7. Pulse-shape factors use the exact values 0.9394 and 0.8814 rather than the
-   rounded 0.94 and 0.88.
-8. Line spacing (SPEC.md section 2) has no formula in SPEC.md and is not
-   implemented.
 
 ## Tests
 
