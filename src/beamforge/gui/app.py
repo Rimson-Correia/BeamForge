@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication
 
 from beamforge.gui import theme
@@ -36,6 +36,9 @@ def main(argv: list[str] | None = None) -> int:
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName("BeamForge")
     app.setWindowIcon(theme.app_icon())
+    # The interface is designed light. Without this, Windows dark mode turns
+    # drop-down lists, menus and dialogs dark while the rest stays light.
+    app.styleHints().setColorScheme(Qt.ColorScheme.Light)
     app.setStyle("Fusion")
     app.setStyleSheet(theme.style_sheet())
 

@@ -47,11 +47,21 @@ QGroupBox * {{ font-weight: 400; }}
 
 QLineEdit, QComboBox {{
     background: #ffffff; border: 1px solid #cfd6e0; border-radius: 6px;
-    padding: 5px 8px; min-height: 18px; selection-background-color: {ACCENT};
+    padding: 5px 8px; min-height: 18px;
 }}
+QLineEdit {{ selection-background-color: {ACCENT}; selection-color: #ffffff; }}
 QLineEdit:focus, QComboBox:focus {{ border: 1px solid {ACCENT}; }}
 QLineEdit[invalid="true"] {{ border: 1px solid #dc2626; background: #fef2f2; }}
 QComboBox::drop-down {{ border: none; width: 22px; }}
+QComboBox QAbstractItemView {{
+    background: #ffffff; color: {TEXT}; border: 1px solid #cfd6e0; outline: 0;
+    selection-background-color: #dbeafe; selection-color: {ACCENT_DARK};
+}}
+QComboBox QAbstractItemView::item {{ min-height: 26px; padding: 2px 8px; color: {TEXT}; }}
+QComboBox QAbstractItemView::item:selected {{ background: #dbeafe; color: {ACCENT_DARK}; }}
+QMenu {{ background: #ffffff; color: {TEXT}; border: 1px solid {BORDER}; padding: 4px; }}
+QMenu::item {{ padding: 6px 22px; border-radius: 4px; }}
+QToolTip {{ background: #ffffff; color: {TEXT}; border: 1px solid #cfd6e0; padding: 4px; }}
 QLabel[role="unit"] {{ color: {MUTED}; }}
 
 QFrame#card {{ background: #ffffff; border: 1px solid {BORDER}; border-radius: 10px; }}

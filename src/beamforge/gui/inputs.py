@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QStyledItemDelegate,
     QVBoxLayout,
     QWidget,
 )
@@ -133,6 +134,7 @@ class InputPanel(QWidget):
         form = self._group(layout, "Energy")
         self.energy_form = form
         self.energy_mode = QComboBox()
+        self.energy_mode.setItemDelegate(QStyledItemDelegate(self.energy_mode))
         for key, label, _unit in ENERGY_MODES:
             self.energy_mode.addItem(label, key)
         self.energy_mode.currentIndexChanged.connect(self._on_change)
@@ -158,14 +160,6 @@ class InputPanel(QWidget):
         self.transmissions.textChanged.connect(self.changed)
         self.transmission_row = self._with_unit(self.transmissions, QLabel(""))
         self._add_row(form, "Transmissions to target", self.transmission_row)
-
-        self.scan_box = QGroupBox("Scanning")
-        self.scan_box.setCheckable(True)
-        self.scan_box.setChecked(False)
-        self.scan_box.toggled.connect(self._on_change)
-        layout.addWidget(self.scan_box)
-        form = QFormLayout(self.scan_box)
-        self._number(form, "scanning", "speed_mm_s", "Scan speed", "mm/s", "10")
 
         for form in self.findChildren(QFormLayout):
             form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
@@ -209,6 +203,8 @@ class InputPanel(QWidget):
 
     def _combo(self, form, section, key, label, options) -> None:
         combo = QComboBox()
+        # A styled delegate makes the drop-down list follow the style sheet.
+        combo.setItemDelegate(QStyledItemDelegate(combo))
         for value, text in options:
             combo.addItem(text, value)
         combo.currentIndexChanged.connect(self._on_change)
@@ -274,7 +270,7 @@ class InputPanel(QWidget):
     def to_dict(self) -> dict[str, Any]:
         """The current inputs in setup-file structure. Raises ValueError if invalid."""
         data: dict[str, dict[str, Any]] = {
-            name: {} for name in ("laser", "energy", "beam", "aperture", "focusing", "scanning")
+            name: {} for name in ("laser", "energy", "beam", "aperture", "focusing")
         }
         model = self.combos[("beam", "model")].currentData()
         mode = self.energy_mode.currentData()
@@ -325,10 +321,6 @@ class InputPanel(QWidget):
             if transmissions:
                 data["energy"]["transmissions"] = transmissions
 
-        if self.scan_box.isChecked():
-            if "rep_rate_hz" not in data["laser"]:
-                raise ValueError("The repetition rate is needed for the scanning results.")
-            put("scanning", "speed_mm_s")
         return {section: content for section, content in data.items() if content}
 
     def from_dict(self, data: dict[str, Any]) -> None:
@@ -365,7 +357,6 @@ class InputPanel(QWidget):
             self._update_visibility()
             if self.aperture_box.isCheckable():
                 self.aperture_box.setChecked("diameter_mm" in data.get("aperture", {}))
-            self.scan_box.setChecked("speed_mm_s" in data.get("scanning", {}))
         finally:
             self.blockSignals(False)
         self._update_visibility()

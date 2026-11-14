@@ -37,9 +37,16 @@ def select(window, value):
     window.recalculate()
 
 
+def example_without_scanning():
+    """The example setup as the window sees it: the window has no scanning inputs."""
+    data = load_dict(EXAMPLE)
+    data.pop("scanning", None)
+    return data
+
+
 def test_window_shows_library_results(window):
     window.load_file(EXAMPLE)
-    expected = calculate(setup_from_dict(load_dict(EXAMPLE)))
+    expected = calculate(setup_from_dict(example_without_scanning()))
     assert window.result["fluence_peak"].value == pytest.approx(expected["fluence_peak"].value)
     assert window.table.rowCount() == len(expected.quantities)
     assert "58.94" in window.cards["spot_fwhm"].value.text()
@@ -51,7 +58,7 @@ def test_inputs_round_trip_through_setup_file(window, tmp_path):
     window.load_file(EXAMPLE)
     saved = tmp_path / "saved.toml"
     saved.write_text(dumps(window.inputs.to_dict()), encoding="utf-8")
-    assert setup_from_dict(load_dict(saved)) == setup_from_dict(load_dict(EXAMPLE))
+    assert setup_from_dict(load_dict(saved)) == setup_from_dict(example_without_scanning())
 
 
 def test_every_model_calculates(window):

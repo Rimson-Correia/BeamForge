@@ -56,10 +56,6 @@ LABELS = {
     "fluence_average_1e2_disc": "Average fluence, 1/e² disc",
     "fluence_gaussian_equivalent": "Gaussian-equivalent fluence",
     "intensity_peak": "Peak intensity",
-    "pulses_per_spot_fwhm": "Pulses per spot (FWHM diameter)",
-    "pulse_overlap_fwhm": "Pulse overlap (FWHM diameter)",
-    "pulses_per_spot_1e2": "Pulses per spot (1/e² diameter)",
-    "pulse_overlap_1e2": "Pulse overlap (1/e² diameter)",
 }
 UNITS = {"um": "µm", "um^2": "µm²", "J/cm^2": "J/cm²", "W/cm^2": "W/cm²"}
 PREFIXES = [(1e3, "k"), (1.0, ""), (1e-3, "m"), (1e-6, "µ"), (1e-9, "n")]
