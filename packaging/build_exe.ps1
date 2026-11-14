@@ -1,15 +1,24 @@
-# Build dist\BeamForge.exe, a single-file Windows application.
+# Build the Windows application.
 #
 # Usage, from the repository root, with the gui and build extras installed:
 #     pip install -e ".[gui,build]"
 #     powershell -ExecutionPolicy Bypass -File packaging\build_exe.ps1
+#     powershell -ExecutionPolicy Bypass -File packaging\build_exe.ps1 -Installer
 #
-# -Python   Python interpreter to use (default: the one on PATH).
-# -WorkDir  Folder for temporary build files (default: build\).
+# Without -Installer: dist\BeamForge.exe, a single portable file.
+# With -Installer:    dist\BeamForge-Setup-<version>.exe, a setup program that
+#                     installs the application with a Start menu entry and an
+#                     uninstaller. Needs Inno Setup 6 (https://jrsoftware.org).
+#
+# -Python     Python interpreter to use (default: the one on PATH).
+# -WorkDir    Folder for temporary build files (default: build\).
+# -InnoSetup  Path to ISCC.exe (default: the usual install folders).
 
 param(
     [string]$Python = "python",
-    [string]$WorkDir = "build"
+    [string]$WorkDir = "build",
+    [switch]$Installer,
+    [string]$InnoSetup = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,10 +49,39 @@ $exclude = @(
 )
 $excludeArgs = $exclude | ForEach-Object { "--exclude-module"; $_ }
 
-& $Python -m PyInstaller --noconfirm --clean --onefile --windowed `
+if (-not $Installer) {
+    & $Python -m PyInstaller --noconfirm --clean --onefile --windowed `
+        --name BeamForge --icon $icon --splash $splash --paths src `
+        --distpath dist --workpath $WorkDir --specpath $WorkDir `
+        @excludeArgs packaging\beamforge_gui.py
+    if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
+    Write-Host "Built $(Join-Path $root 'dist\BeamForge.exe')"
+    exit 0
+}
+
+# Installer: build the application as a folder (it starts faster than the single
+# file, which unpacks itself on every launch), then pack the folder with Inno Setup.
+if (-not $InnoSetup) {
+    $InnoSetup = @(
+        "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+        "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+        "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+}
+if (-not $InnoSetup -or -not (Test-Path $InnoSetup)) {
+    throw "Inno Setup 6 (ISCC.exe) not found. Install it or pass -InnoSetup PATH."
+}
+
+$appDir = Join-Path (Resolve-Path $WorkDir) "app"
+& $Python -m PyInstaller --noconfirm --clean --onedir --windowed `
     --name BeamForge --icon $icon --splash $splash --paths src `
-    --distpath dist --workpath $WorkDir --specpath $WorkDir `
+    --distpath $appDir --workpath $WorkDir --specpath $WorkDir `
     @excludeArgs packaging\beamforge_gui.py
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
-Write-Host "Built $(Join-Path $root 'dist\BeamForge.exe')"
+$version = & $Python -c "import beamforge; print(beamforge.__version__)"
+& $InnoSetup /Qp "/DAppVersion=$version" "/DAppDir=$appDir\BeamForge" `
+    "/DIconFile=$icon" "/DRoot=$root" packaging\installer.iss
+if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+
+Write-Host "Built $(Join-Path $root "dist\BeamForge-Setup-$version.exe")"
