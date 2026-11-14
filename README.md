@@ -84,18 +84,6 @@ pip install -e ".[gui,build]"
 powershell -ExecutionPolicy Bypass -File packaging\build_exe.ps1
 ```
 
-Build an installer, `dist\BeamForge-Setup-<version>.exe`, for putting the
-application on other Windows computers (Start menu entry, uninstaller, no
-administrator rights needed). This needs
-[Inno Setup 6](https://jrsoftware.org/isinfo.php) on the build machine:
-
-```bash
-powershell -ExecutionPolicy Bypass -File packaging\build_exe.ps1 -Installer
-```
-
-Neither file is code-signed, so Windows shows a SmartScreen warning the first
-time it is run.
-
 The interface contains no physics. It builds the same input structure as a setup
 file and calls the library, so the GUI, the command line and Python give
 identical numbers. It uses PySide6 (Qt) and pyqtgraph, which are optional
