@@ -13,7 +13,8 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from beamforge.calculator import Setup, calculate  # noqa: E402
 from beamforge.gui import splash  # noqa: E402
-from beamforge.gui.main_window import MainWindow, format_number  # noqa: E402
+from beamforge.gui.main_window import MainWindow  # noqa: E402
+from beamforge.gui.widgets import format_number  # noqa: E402
 from beamforge.setup_file import dumps, load_dict, setup_from_dict  # noqa: E402
 
 EXAMPLE = Path(__file__).parent.parent / "examples" / "reference_setup.toml"
@@ -49,7 +50,8 @@ def test_window_shows_library_results(window):
     expected = calculate(setup_from_dict(example_without_scanning()))
     assert window.result["fluence_peak"].value == pytest.approx(expected["fluence_peak"].value)
     assert window.table.rowCount() == len(expected.quantities)
-    assert "58.94" in window.cards["spot_fwhm"].value.text()
+    fwhm = format_number(expected["spot_fwhm"].display_value)
+    assert fwhm in window.cards["spot_fwhm"].value.text()
     assert "scalar" in window.notes.text()
     assert window.error.isHidden()
 
@@ -100,6 +102,22 @@ def test_file_the_library_cannot_calculate_is_refused(window, tmp_path, monkeypa
     window.load_file(path)
     assert messages and "aperture" in messages[0]
     assert window.setup == before
+
+
+def test_depth_of_focus_window(window):
+    window.load_file(EXAMPLE)
+    window.show_focus()
+    focus = window.focus_window
+    assert focus.isVisible()
+    assert focus.table.rowCount() == 61
+    expected = calculate(setup_from_dict(example_without_scanning()))
+    toward = format_number(expected["rayleigh_length_toward_lens"].display_value)
+    assert toward in focus.cards["toward"].value.text()
+    assert "J/cm²" in focus.table.horizontalHeaderItem(4).text()
+    select(window, "flat_top")
+    assert not focus.message.isHidden()
+    assert focus.table.rowCount() == 0
+    focus.close()
 
 
 def test_every_model_calculates(window):

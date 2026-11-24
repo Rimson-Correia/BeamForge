@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QFileDialog,
-    QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -31,10 +30,12 @@ from PySide6.QtWidgets import (
 
 from beamforge import __version__
 from beamforge.beams import E2_LEVEL, GaussianSpot, Spot, sample_profile
-from beamforge.calculator import Quantity, Result, Setup, build_spot, calculate
+from beamforge.calculator import Result, Setup, build_spot, calculate
 from beamforge.cli import format_report, write_csv
 from beamforge.gui import theme
+from beamforge.gui.focus_window import FocusWindow
 from beamforge.gui.inputs import InputPanel
+from beamforge.gui.widgets import Card, display
 from beamforge.setup_file import dumps, load_dict, setup_from_dict
 
 REPOSITORY = "https://github.com/Rimson-Correia/BeamForge"
@@ -44,7 +45,9 @@ LABELS = {
     "spot_diameter_1e2": "Spot diameter (1/e²)",
     "a_eff": "Effective area A_eff",
     "waist_radius": "Waist radius w₀",
-    "rayleigh_range": "Rayleigh range",
+    "rayleigh_length_toward_lens": "Rayleigh length, toward lens",
+    "rayleigh_length_away_from_lens": "Rayleigh length, away from lens",
+    "best_focus_offset": "Best focus from focal plane",
     "first_dark_ring_diameter": "First dark ring diameter",
     "transmission_to_target": "Transmission to target",
     "required_pulse_energy": "Required pulse energy",
@@ -57,67 +60,12 @@ LABELS = {
     "fluence_gaussian_equivalent": "Gaussian-equivalent fluence",
     "intensity_peak": "Peak intensity",
 }
-UNITS = {"um": "µm", "um^2": "µm²", "J/cm^2": "J/cm²", "W/cm^2": "W/cm²"}
-PREFIXES = [(1e3, "k"), (1.0, ""), (1e-3, "m"), (1e-6, "µ"), (1e-9, "n")]
-SUPERSCRIPT = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
 CARDS = [
     ("fluence_peak", "PEAK FLUENCE", "F₀ = E / A_eff"),
     ("spot_fwhm", "SPOT DIAMETER", "FWHM of intensity"),
     ("a_eff", "EFFECTIVE AREA", "A_eff = ∬ I / I_max dA"),
     ("intensity_peak", "PEAK INTENSITY", "I₀ = k F₀ / τ"),
 ]
-
-
-def format_number(value: float, digits: int = 4) -> str:
-    """Format for display: plain digits in the everyday range, × 10ⁿ outside it."""
-    if value == 0:
-        return "0"
-    size = abs(value)
-    if 1e3 <= size < 1e6:
-        return f"{value:.0f}"
-    if 1e-3 <= size < 1e3:
-        return f"{value:.{digits}g}"
-    mantissa, exponent = f"{value:.{digits - 1}e}".split("e")
-    return f"{mantissa} × 10{str(int(exponent)).translate(SUPERSCRIPT)}"
-
-
-def display(quantity: Quantity) -> tuple[str, str]:
-    """Value text and unit for a result. Joules and watts get an SI prefix."""
-    value = quantity.display_value
-    unit = UNITS.get(quantity.display_unit, quantity.display_unit)
-    if unit in ("J", "W") and value > 0:
-        factor, prefix = next((f, p) for f, p in PREFIXES if value >= f or f == 1e-9)
-        return format_number(value / factor), prefix + unit
-    return format_number(value), unit
-
-
-class Card(QFrame):
-    """One headline number with its definition underneath."""
-
-    def __init__(self, title: str, definition: str) -> None:
-        super().__init__()
-        self.setObjectName("card")
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(2)
-        heading = QLabel(title)
-        heading.setObjectName("cardTitle")
-        self.value = QLabel("—")
-        self.value.setObjectName("cardValue")
-        self.value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        note = QLabel(definition)
-        note.setObjectName("cardSub")
-        for widget in (heading, self.value, note):
-            layout.addWidget(widget)
-
-    def show_quantity(self, quantity: Quantity | None) -> None:
-        if quantity is None:
-            self.value.setText("—")
-        else:
-            value, unit = display(quantity)
-            self.value.setText(
-                f"{value} <span style='font-size:11pt; color:{theme.MUTED}'>{unit}</span>"
-            )
 
 
 class MainWindow(QMainWindow):
@@ -129,6 +77,7 @@ class MainWindow(QMainWindow):
         self.setup: Setup | None = None
         self.result: Result | None = None
         self.spot: Spot | None = None
+        self.focus_window: FocusWindow | None = None
 
         self.inputs = InputPanel()
         scroll = QScrollArea()
@@ -283,6 +232,7 @@ class MainWindow(QMainWindow):
         csv = action("Export CSV…", self.export_csv, "Ctrl+E")
         report = action("Export report…", self.export_report, "Ctrl+R")
         copy = action("Copy results", self.copy_results, "Ctrl+Shift+C")
+        focus = action("Depth of focus…", self.show_focus, "Ctrl+D")
         quit_ = action("Quit", self.close, QKeySequence.StandardKey.Quit)
         about = action("About BeamForge", self.show_about)
 
@@ -292,6 +242,7 @@ class MainWindow(QMainWindow):
         file_menu.addActions([csv, report, copy])
         file_menu.addSeparator()
         file_menu.addAction(quit_)
+        self.menuBar().addMenu("&Tools").addAction(focus)
         self.menuBar().addMenu("&Help").addAction(about)
 
         bar = QToolBar("Main")
@@ -300,6 +251,8 @@ class MainWindow(QMainWindow):
         bar.addActions([open_, save])
         bar.addSeparator()
         bar.addActions([csv, report, copy])
+        bar.addSeparator()
+        bar.addAction(focus)
         self.addToolBar(bar)
 
     # -- calculation and display ----------------------------------------------
@@ -318,6 +271,8 @@ class MainWindow(QMainWindow):
         self.setup, self.result, self.spot = setup, result, spot
         self._show_result()
         self._draw_plots()
+        if self.focus_window is not None and self.focus_window.isVisible():
+            self.focus_window.refresh(setup, result)
 
     def _show_result(self) -> None:
         result = self.result
@@ -454,6 +409,16 @@ class MainWindow(QMainWindow):
                 )
             except OSError as error:
                 self._fail("Cannot export", error)
+
+    def show_focus(self) -> None:
+        """Open the Depth of focus window for the current inputs."""
+        if self.focus_window is None:
+            self.focus_window = FocusWindow(self)
+        self.focus_window.show()
+        self.focus_window.raise_()
+        self.focus_window.activateWindow()
+        if self.setup is not None:
+            self.focus_window.refresh(self.setup, self.result)
 
     def copy_results(self) -> None:
         rows = [

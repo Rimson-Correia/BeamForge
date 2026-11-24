@@ -140,7 +140,10 @@ class InputPanel(QWidget):
         form = QFormLayout(self.focus_box)
         self._number(form, "focusing", "focal_length_mm", "Focal length", "mm", "350")
         self._number(
-            form, "focusing", "defocus_mm", "Target distance from focus", "mm", "0", positive=False
+            form, "focusing", "defocus_mm", "Target from best focus", "mm", "0", positive=False
+        )
+        self.numbers[("focusing", "defocus_mm")].setToolTip(
+            "Distance of the target from best focus. Negative = closer to the lens."
         )
 
         form = self._group(layout, "Energy")
@@ -246,7 +249,7 @@ class InputPanel(QWidget):
             ("beam", "diameter_definition"): focused,
             ("beam", "m2"): model == "gaussian",
             ("beam", "flat_top_diameter_um"): model == "flat_top",
-            ("focusing", "defocus_mm"): model == "gaussian",
+            ("focusing", "defocus_mm"): focused,
             ("energy", "measured"): model == "truncated_gaussian" and bool(mode),
         }
         for key, visible in self.shown.items():
