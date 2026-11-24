@@ -75,17 +75,24 @@ class Spot(ABC):
     def _scale(self) -> float:
         """A characteristic radius (m) used to step outwards when root finding."""
 
-    def radius_at_level(self, level: float) -> float:
-        """Smallest radius where I / I_max falls to ``level`` (0 < level < 1).
+    @property
+    def _peak_radius(self) -> float:
+        """Radius (m) of the brightest point: the centre, unless a model says otherwise."""
+        return 0.0
 
-        Found numerically: step outwards from the centre until the profile drops
-        below ``level``, then refine with Brent's method. For profiles with side
-        lobes this is the crossing inside the main lobe.
+    def radius_at_level(self, level: float) -> float:
+        """Smallest radius beyond the brightest point where I / I_max falls to ``level``.
+
+        Found numerically: step outwards from the brightest point (normally the
+        centre) until the profile drops below ``level`` (0 < level < 1), then refine
+        with Brent's method. For profiles with side lobes this is the crossing
+        inside the main lobe; for a ring-shaped spot it is the outer edge of the
+        brightest ring.
         """
         if not 0.0 < level < 1.0:
             raise ValueError("level must be between 0 and 1")
         step = self._scale / 20.0
-        r = 0.0
+        r = self._peak_radius
         for _ in range(100_000):
             if float(self.profile(r + step)) < level:
                 return optimize.brentq(lambda x: float(self.profile(x)) - level, r, r + step)

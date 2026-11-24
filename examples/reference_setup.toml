@@ -25,7 +25,7 @@ diameter_mm = 5
 
 [focusing]
 focal_length_mm = 350
-# defocus_mm = 0                 # gaussian model only
+# defocus_mm = 0                 # target from best focus; negative = toward the lens
 
 [scanning]
 speed_mm_s = 10

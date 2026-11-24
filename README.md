@@ -25,9 +25,10 @@ beamforge examples/reference_setup.toml --csv results.csv
 ```
 
 The report lists the inputs, the beam model, its assumptions, any warnings, and
-every result with its definition. For this setup the spot FWHM is 58.94 µm and
-A_eff is 4014 µm², compared with 20.99 µm and 499 µm² if the aperture were
-ignored and an ideal Gaussian assumed.
+every result with its definition. Results are given at best focus, which for this
+setup lies 0.85 mm closer to the lens than the focal plane: spot FWHM 58.80 µm,
+A_eff 4004 µm² (58.94 µm and 4014 µm² in the focal plane itself), compared with
+20.99 µm and 499 µm² if the aperture were ignored and an ideal Gaussian assumed.
 
 The same from Python, in SI units:
 
@@ -52,6 +53,33 @@ print(result["fluence_peak"].value)  # J/m²
 To go from a wanted fluence to the required energy and power, give
 `target_peak_fluence` (`target_peak_fluence_j_cm2` in the file) instead of a
 power.
+
+## Depth of focus
+
+Every model except the flat-top also reports the Rayleigh length: the distance
+from best focus at which the peak fluence has fallen to half, toward the lens and
+away from it. For a Gaussian beam this is z_R = π w₀² / (M² λ). For a clipped beam
+the spot is computed in any plane behind the lens from the paraxial Fresnel
+integral, so the two directions can differ and best focus lies slightly closer to
+the lens than the focal plane.
+
+For the reference setup: best focus 0.85 mm before the focal plane, Rayleigh
+length 13.19 mm toward the lens and 14.52 mm away, a depth of focus of 27.7 mm.
+The ideal-Gaussian formula, which ignores the aperture, would give 1.25 mm.
+
+Put the target anywhere with `defocus_mm` in `[focusing]` (distance from best
+focus, negative toward the lens); every result is then computed there. A table of
+spot size and peak fluence against distance:
+
+```bash
+beamforge examples/reference_setup.toml --through-focus through_focus.csv
+```
+
+In the desktop application, **Depth of focus** opens a separate window with the
+same table, plots of spot diameter and peak fluence against distance, and CSV
+export. Far from focus a clipped beam breaks into rings; the FWHM and 1/e²
+diameters then jump, and where the centre is no longer the brightest point the
+table and plots mark the spot as ring-shaped.
 
 ## Desktop application
 
@@ -93,10 +121,13 @@ dependencies; the library itself needs only numpy and scipy.
 
 | `model` | Class | Needs |
 |---|---|---|
-| `gaussian` | `GaussianSpot` | beam diameter, focal length; optional M², defocus |
-| `truncated_gaussian` | `TruncatedGaussianSpot` | beam diameter, aperture, focal length |
-| `airy` | `AirySpot` | aperture, focal length |
+| `gaussian` | `GaussianSpot` | beam diameter, focal length; optional M², target distance |
+| `truncated_gaussian` | `FresnelSpot` | beam diameter, aperture, focal length; optional target distance |
+| `airy` | `FresnelSpot` | aperture, focal length; optional target distance |
 | `flat_top` | `FlatTopSpot` | spot diameter on target |
+
+`TruncatedGaussianSpot` and `AirySpot` are the focal-plane special cases of
+`FresnelSpot` and carry the validation values of SPEC.md section 5.
 
 A measured camera image is handled by `beamforge.measured`
 (`effective_area_from_image`, `fwhm_from_image`); it is not yet wired into the
@@ -114,9 +145,9 @@ setup file.
 
 ## Assumptions
 
-Scalar field, paraxial focusing, ideal thin lens. The diffraction models
-(`truncated_gaussian`, `airy`) are valid in the focal plane only. Each model
-lists its own assumptions in the output.
+Scalar field, paraxial focusing and propagation, ideal thin lens. The Gaussian
+model places the waist in the focal plane. Each model lists its own assumptions
+in the output.
 
 ## Uncertainties
 

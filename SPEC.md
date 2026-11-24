@@ -20,7 +20,7 @@ propagation, material response. Control of lab hardware is out of scope permanen
 | Energy | average power or energy per pulse, where it is measured, transmission of each element between that point and the target |
 | Beam before the lens | profile type, diameter and which definition it uses (1/e², FWHM, flat-top width), M² |
 | Aperture | none, or circular with a given diameter |
-| Focusing | focal length, distance of the target from the focal plane |
+| Focusing | focal length, distance of the target from best focus (negative toward the lens) |
 | Scanning (optional) | scan speed, line spacing |
 | Uncertainties (optional) | standard uncertainty on any input |
 
@@ -67,6 +67,24 @@ radius, T = a/w truncation ratio, E pulse energy on target, f_rep repetition rat
 - A_eff = λ² f² (1 − e^(−2T²)) / [2π w² (1 − e^(−T²))²].
 - Limits to test: T → ∞ gives the Gaussian result, T → 0 gives the Airy result.
 
+**Through focus (Gaussian, truncated Gaussian, Airy)**
+- Field at a distance z from the lens, aperture at the lens (paraxial Fresnel
+  diffraction): U(ρ, z) = (2π a² / (λ z)) ∫₀¹ A(s) exp(i ψ s²) J₀(x s) s ds, with
+  s = r / a, x = 2π a ρ / (λ z), ψ = π a² (1/z − 1/f) / λ, and A(s) = exp(−T² s²)
+  (truncated Gaussian) or 1 (uniform aperture). At z = f this is the focal-plane
+  integral above.
+- A_eff(z) = λ² z² p / (2π a² max |g|²), g the integral above, p = ∫₀¹ A(s)² s ds.
+- Best focus: the plane of highest peak intensity. For a² / (λ f) ≫ 1 it lies
+  slightly closer to the lens than f (focal shift). The target position is given
+  as its distance from best focus, negative toward the lens.
+- Rayleigh length: the distance from best focus at which the peak fluence E / A_eff
+  falls to half, reported toward and away from the lens. For a Gaussian beam it is
+  z_R = π w₀² / (M² λ), and the Gaussian model keeps its closed form w(z).
+- Far from focus the spot can become ring-shaped. The FWHM and 1/e² diameters are
+  then those of the brightest ring, and the output says so.
+- References: Goodman, Introduction to Fourier Optics, ch. 4–5; Born and Wolf,
+  Principles of Optics, sec. 8.8; Y. Li and E. Wolf, Opt. Commun. 39, 211 (1981).
+
 **Flat-top:** A = π d² / 4, F = E / A.
 
 **Measured profile:** subtract background, A_eff = Σ(I)/I_max × pixel area /
@@ -94,6 +112,16 @@ Reference setup: λ = 800 nm, f = 350 mm, input 1/e² diameter 10 mm, aperture 5
 | Transmitted energy fraction | 0.3935 |
 | A_eff, Airy | 3993 µm² |
 | A_eff, truncated Gaussian | 4014 µm² |
+
+These values are in the geometric focal plane (z = f).
+
+Through-focus checks:
+
+| Case | Expected |
+|---|---|
+| Aperture much larger than the beam (T = 6) | Rayleigh length = Gaussian z_R (1.248 mm); best focus −f / (1 + (π w² / (λ f))²) = −4.448 µm (S. A. Self, Appl. Opt. 22, 658 (1983)) |
+| Uniform aperture, a² / (λ f) ≫ 1 | focal shift −f / (1 + π² N² / 12) (Li and Wolf 1981); axial intensity [sin(u/4) / (u/4)]², u = 2π a² Δz / (λ f²) (Born and Wolf, sec. 8.8) |
+| Reference setup (regression, not independent) | best focus −0.852 mm; Rayleigh length 13.19 mm toward the lens, 14.52 mm away |
 
 These cases check the optics only. Power and pulse energy are always user inputs;
 the specification fixes no values for them. Tests of the energy and fluence

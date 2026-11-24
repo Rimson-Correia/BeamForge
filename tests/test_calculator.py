@@ -1,5 +1,6 @@
 """End-to-end: Setup -> results, setup file, CLI."""
 
+import math
 from pathlib import Path
 
 import pytest
@@ -60,8 +61,8 @@ def test_optics_only_and_warnings():
 def test_invalid_setups():
     with pytest.raises(ValueError, match="needs"):
         calculate(Setup(model="airy", wavelength=800e-9))
-    with pytest.raises(ValueError, match="defocus"):
-        calculate(Setup(model="airy", **OPTICS, defocus=1e-3))
+    with pytest.raises(ValueError, match="lens"):
+        calculate(Setup(model="airy", **OPTICS, defocus=-1.0))
     with pytest.raises(ValueError, match="only one"):
         calculate(Setup(model="airy", **OPTICS, pulse_energy=1.0, target_peak_fluence=1.0))
     with pytest.raises(ValueError, match="after the aperture"):
@@ -99,6 +100,24 @@ def test_reverse_direction_with_no_transmission():
         calculate(Setup(model="airy", **OPTICS, target_peak_fluence=1e4, transmissions=(0.0,)))
 
 
+def test_rayleigh_length_rows():
+    gauss = calculate(
+        Setup(model="gaussian", wavelength=800e-9, focal_length=0.35, beam_radius=5e-3)
+    )
+    z_r = math.pi * gauss["waist_radius"].value ** 2 / 800e-9
+    assert gauss["rayleigh_length_toward_lens"].value == pytest.approx(z_r)
+    assert gauss["rayleigh_length_away_from_lens"].value == pytest.approx(z_r)
+    assert gauss["best_focus_offset"].value == 0.0
+    clipped = calculate(Setup(model="truncated_gaussian", **OPTICS))
+    assert clipped["rayleigh_length_away_from_lens"].display_unit == "mm"
+    assert clipped["best_focus_offset"].value < 0.0
+    flat = calculate(Setup(model="flat_top", flat_top_diameter=1e-4))
+    with pytest.raises(KeyError):
+        flat["rayleigh_length_toward_lens"]
+    with pytest.raises(ValueError, match="flat_top"):
+        calculate(Setup(model="flat_top", flat_top_diameter=1e-4, defocus=1e-3))
+
+
 def test_setup_file_units():
     setup = load_setup(EXAMPLE)
     assert setup.model == "truncated_gaussian"
@@ -118,3 +137,10 @@ def test_cli(tmp_path, capsys):
     assert "fluence_peak" in text and "Assumptions" in text
     assert "spot_fwhm" in out.read_text(encoding="utf-8")
     assert main([str(tmp_path / "missing.toml")]) == 1
+    focus = tmp_path / "focus.csv"
+    assert main([str(EXAMPLE), "--through-focus", str(focus)]) == 0
+    lines = focus.read_text(encoding="utf-8").splitlines()
+    assert lines[0].startswith("distance_from_best_focus_mm")
+    assert lines[0].endswith("peak_fluence_j_cm2")
+    assert len(lines) == 62
+    assert lines[0].count(",") == 6

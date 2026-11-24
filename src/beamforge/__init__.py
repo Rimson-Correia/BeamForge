@@ -7,11 +7,14 @@ from beamforge.beams import (
     Spot,
     TruncatedGaussianSpot,
 )
-from beamforge.calculator import Quantity, Result, Setup, calculate
+from beamforge.calculator import FocusScan, Quantity, Result, Setup, calculate, through_focus
+from beamforge.focus import FresnelSpot
 
 __all__ = [
     "AirySpot",
     "FlatTopSpot",
+    "FocusScan",
+    "FresnelSpot",
     "GaussianSpot",
     "Quantity",
     "Result",
@@ -19,5 +22,6 @@ __all__ = [
     "Spot",
     "TruncatedGaussianSpot",
     "calculate",
+    "through_focus",
 ]
 __version__ = "0.1.0.dev0"

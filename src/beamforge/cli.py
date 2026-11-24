@@ -1,4 +1,4 @@
-"""Command-line interface: ``beamforge setup.toml [--csv results.csv]``."""
+"""Command-line interface: ``beamforge setup.toml [--csv results.csv] [--through-focus f.csv]``."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import csv
 import dataclasses
 import sys
 
-from beamforge.calculator import Result, Setup, calculate
+from beamforge.calculator import FocusScan, Result, Setup, calculate, through_focus
 from beamforge.setup_file import load_setup
 
 
@@ -40,12 +40,49 @@ def write_csv(path: str, result: Result) -> None:
             )
 
 
+def write_focus_csv(path: str, scan: FocusScan, energy: float | None = None) -> None:
+    """Through-focus table: one row per target distance from best focus.
+
+    With the pulse energy on target, the absolute peak fluence E / A_eff is added.
+    """
+    header = [
+        "distance_from_best_focus_mm",
+        "spot_fwhm_um",
+        "spot_diameter_1e2_um",
+        "a_eff_um2",
+        "peak_fluence_relative_to_best_focus",
+        "spot_centre_is_brightest",
+    ]
+    if energy is not None:
+        header.append("peak_fluence_j_cm2")
+    with open(path, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(header)
+        for i, distance in enumerate(scan.distance):
+            row = [
+                distance * 1e3,
+                scan.fwhm[i] * 1e6,
+                scan.diameter_1e2[i] * 1e6,
+                scan.a_eff[i] * 1e12,
+                scan.relative_peak_fluence[i],
+                int(scan.centre_is_peak[i]),
+            ]
+            if energy is not None:
+                row.append(energy / scan.a_eff[i] * 1e-4)
+            writer.writerow([f"{value:.6g}" for value in row])
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="beamforge", description="Laser parameters on target from a setup file."
     )
     parser.add_argument("setup", help="TOML setup file")
     parser.add_argument("--csv", help="also write the results table to this CSV file")
+    parser.add_argument(
+        "--through-focus",
+        metavar="CSV",
+        help="also write spot size and peak fluence against distance from best focus",
+    )
     args = parser.parse_args(argv)
     try:
         setup = load_setup(args.setup)
@@ -56,6 +93,14 @@ def main(argv: list[str] | None = None) -> int:
     print(format_report(setup, result))
     if args.csv:
         write_csv(args.csv, result)
+    if args.through_focus:
+        try:
+            scan = through_focus(setup)
+        except ValueError as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 1
+        names = {q.name: q.value for q in result.quantities}
+        write_focus_csv(args.through_focus, scan, names.get("pulse_energy_on_target"))
     return 0
 
 
