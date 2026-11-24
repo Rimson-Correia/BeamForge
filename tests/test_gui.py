@@ -11,7 +11,7 @@ pytest.importorskip("pyqtgraph")
 
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
-from beamforge.calculator import calculate  # noqa: E402
+from beamforge.calculator import Setup, calculate  # noqa: E402
 from beamforge.gui import splash  # noqa: E402
 from beamforge.gui.main_window import MainWindow, format_number  # noqa: E402
 from beamforge.setup_file import dumps, load_dict, setup_from_dict  # noqa: E402
@@ -59,6 +59,47 @@ def test_inputs_round_trip_through_setup_file(window, tmp_path):
     saved = tmp_path / "saved.toml"
     saved.write_text(dumps(window.inputs.to_dict()), encoding="utf-8")
     assert setup_from_dict(load_dict(saved)) == setup_from_dict(example_without_scanning())
+
+
+def test_new_window_uses_library_defaults(window):
+    library = Setup(model="truncated_gaussian")
+    assert window.setup.measured == library.measured
+    assert window.setup.pulse_shape == library.pulse_shape
+
+
+def test_loading_a_file_resets_settings_it_leaves_out(window, tmp_path):
+    sparse = {
+        "laser": {"wavelength_nm": 800, "rep_rate_hz": 2000, "pulse_duration_fs": 100},
+        "energy": {"pulse_energy_uj": 40},
+        "beam": {"model": "truncated_gaussian", "diameter_mm": 10},
+        "aperture": {"diameter_mm": 5},
+        "focusing": {"focal_length_mm": 350},
+    }
+    full = {section: dict(content) for section, content in sparse.items()}
+    full["laser"]["pulse_shape"] = "sech2"
+    full["energy"].update(measured="before_aperture", transmissions=[0.5])
+    full["beam"]["diameter_definition"] = "fwhm"
+    for name, data in (("full.toml", full), ("sparse.toml", sparse)):
+        (tmp_path / name).write_text(dumps(data), encoding="utf-8")
+    window.load_file(tmp_path / "full.toml")
+    window.load_file(tmp_path / "sparse.toml")
+    assert window.setup == setup_from_dict(sparse)
+    expected = calculate(setup_from_dict(sparse))
+    assert window.result["fluence_peak"].value == pytest.approx(expected["fluence_peak"].value)
+
+
+def test_file_the_library_cannot_calculate_is_refused(window, tmp_path, monkeypatch):
+    window.load_file(EXAMPLE)
+    before = window.setup
+    data = example_without_scanning()
+    data.pop("aperture")
+    path = tmp_path / "incomplete.toml"
+    path.write_text(dumps(data), encoding="utf-8")
+    messages = []
+    monkeypatch.setattr(window, "_fail", lambda title, error: messages.append(str(error)))
+    window.load_file(path)
+    assert messages and "aperture" in messages[0]
+    assert window.setup == before
 
 
 def test_every_model_calculates(window):

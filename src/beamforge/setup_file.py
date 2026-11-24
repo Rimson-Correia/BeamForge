@@ -19,6 +19,9 @@ if sys.version_info >= (3, 11):
 else:  # pragma: no cover
     import tomli as tomllib
 
+# Diameter definition used when a setup file does not name one.
+DEFAULT_DIAMETER_DEFINITION = "1/e2"
+
 # (section, key) -> (Setup field, factor to SI)
 _SCALARS = {
     ("laser", "wavelength_nm"): ("wavelength", 1e-9),
@@ -65,7 +68,8 @@ def setup_from_dict(data: dict[str, Any]) -> Setup:
     fields["model"] = beam["model"]
     if "diameter_mm" in beam:
         fields["beam_radius"] = gaussian_radius_from_diameter(
-            float(beam["diameter_mm"]) * 1e-3, beam.get("diameter_definition", "1/e2")
+            float(beam["diameter_mm"]) * 1e-3,
+            beam.get("diameter_definition", DEFAULT_DIAMETER_DEFINITION),
         )
     if "diameter_mm" in data.get("aperture", {}):
         fields["aperture_radius"] = float(data["aperture"]["diameter_mm"]) * 1e-3 / 2.0

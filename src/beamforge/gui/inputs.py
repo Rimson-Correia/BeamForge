@@ -7,6 +7,7 @@ GUI, the file format and the command line share one input boundary
 
 from __future__ import annotations
 
+import dataclasses
 import math
 import re
 from typing import Any
@@ -24,6 +25,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from beamforge.calculator import Setup
+from beamforge.setup_file import DEFAULT_DIAMETER_DEFINITION
+
 MODELS = [
     ("truncated_gaussian", "Truncated Gaussian"),
     ("gaussian", "Gaussian (ideal or M²)"),
@@ -37,6 +41,14 @@ ENERGY_MODES = [
     ("", "Optics only (no energy)", ""),
 ]
 Key = tuple[str, str]
+_LIBRARY_DEFAULTS = {field.name: field.default for field in dataclasses.fields(Setup)}
+# Choices a setup file may leave out. The window uses the same defaults as the library,
+# so a file gives the same result in the window and on the command line.
+COMBO_DEFAULTS: dict[Key, str] = {
+    ("laser", "pulse_shape"): _LIBRARY_DEFAULTS["pulse_shape"],
+    ("beam", "diameter_definition"): DEFAULT_DIAMETER_DEFINITION,
+    ("energy", "measured"): _LIBRARY_DEFAULTS["measured"],
+}
 LABEL_WIDTH = 150
 
 
@@ -207,6 +219,8 @@ class InputPanel(QWidget):
         combo.setItemDelegate(QStyledItemDelegate(combo))
         for value, text in options:
             combo.addItem(text, value)
+        if (section, key) in COMBO_DEFAULTS:
+            combo.setCurrentIndex(combo.findData(COMBO_DEFAULTS[(section, key)]))
         combo.currentIndexChanged.connect(self._on_change)
         combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         combo.setMinimumContentsLength(12)
@@ -324,14 +338,21 @@ class InputPanel(QWidget):
         return {section: content for section, content in data.items() if content}
 
     def from_dict(self, data: dict[str, Any]) -> None:
-        """Fill the panel from setup-file structure (the inverse of ``to_dict``)."""
+        """Fill the panel from setup-file structure (the inverse of ``to_dict``).
+
+        A choice the file leaves out gets the library default and an optional number
+        it leaves out is cleared, never kept from the previous setup, so the window
+        computes exactly what the file describes. Numbers that the file's model does
+        not use keep their text, so switching model afterwards still works.
+        """
         self.blockSignals(True)
         try:
             for (section, key), combo in self.combos.items():
-                value = data.get(section, {}).get(key)
+                value = data.get(section, {}).get(key, COMBO_DEFAULTS.get((section, key)))
                 index = combo.findData(value)
                 if index >= 0:
                     combo.setCurrentIndex(index)
+            self._update_visibility()  # which numbers are optional depends on the model
             defaults = {("beam", "m2"): "1", ("focusing", "defocus_mm"): "0"}
             for (section, key), edit in self.numbers.items():
                 value = data.get(section, {}).get(key)

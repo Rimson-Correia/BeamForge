@@ -404,7 +404,9 @@ class MainWindow(QMainWindow):
     def load_file(self, path: str | Path) -> None:
         try:
             data = load_dict(path)
-            setup_from_dict(data)  # reject unknown keys before touching the inputs
+            # Refuse a file the library cannot calculate, before touching the inputs, so
+            # the window never fills its gaps with values from the previous setup.
+            calculate(setup_from_dict(data))
         except (OSError, ValueError) as error:
             self._fail("Could not open setup", error)
             return
