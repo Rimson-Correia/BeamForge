@@ -26,6 +26,16 @@ DIFFRACTION_ASSUMPTIONS = (
 E2_LEVEL = math.exp(-2.0)
 
 
+def check_positive(name: str, value: float) -> None:
+    """Raise ``ValueError`` unless ``value`` is a finite number greater than zero.
+
+    Lengths, the wavelength and similar inputs cannot be zero, negative or NaN;
+    without this check some of them would give negative spot sizes silently.
+    """
+    if not (math.isfinite(value) and value > 0.0):
+        raise ValueError(f"{name} must be a positive number, got {value!r}")
+
+
 def gaussian_radius_from_diameter(diameter: float, definition: str) -> float:
     """Convert a Gaussian beam diameter to the 1/e^2 intensity radius w.
 
@@ -130,8 +140,14 @@ class GaussianSpot(Spot):
     defocus: float = 0.0
 
     def __post_init__(self) -> None:
+        for name in ("wavelength", "focal_length", "input_radius"):
+            check_positive(name, getattr(self, name))
+        if not math.isfinite(self.m2):
+            raise ValueError("M^2 must be a finite number")
         if self.m2 < 1.0:
             raise ValueError("M^2 cannot be smaller than 1")
+        if not math.isfinite(self.defocus):
+            raise ValueError("defocus must be a finite number")
 
     @property
     def name(self) -> str:
@@ -210,6 +226,10 @@ class AirySpot(Spot):
         "target in the focal plane",
     )
 
+    def __post_init__(self) -> None:
+        for name in ("wavelength", "focal_length", "aperture_radius"):
+            check_positive(name, getattr(self, name))
+
     def _x(self, rho):
         return (
             2.0
@@ -277,6 +297,10 @@ class TruncatedGaussianSpot(Spot):
         "target in the focal plane",
     )
 
+    def __post_init__(self) -> None:
+        for name in ("wavelength", "focal_length", "input_radius", "aperture_radius"):
+            check_positive(name, getattr(self, name))
+
     @property
     def truncation_ratio(self) -> float:
         return self.aperture_radius / self.input_radius
@@ -320,6 +344,9 @@ class FlatTopSpot(Spot):
 
     name = "Flat-top at target"
     assumptions = ("perfectly uniform fluence inside the stated diameter, sharp edges",)
+
+    def __post_init__(self) -> None:
+        check_positive("diameter", self.diameter)
 
     def profile(self, rho):
         return np.where(np.abs(np.asarray(rho, dtype=float)) <= self.diameter / 2.0, 1.0, 0.0)

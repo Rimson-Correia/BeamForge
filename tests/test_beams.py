@@ -105,6 +105,25 @@ def test_flat_top():
     assert spot.encircled_fraction(80e-6) == 1.0
 
 
+@pytest.mark.parametrize(
+    "make",
+    [
+        lambda: GaussianSpot(-LAM, F, W),
+        lambda: GaussianSpot(LAM, F, W, m2=float("nan")),
+        lambda: GaussianSpot(LAM, F, W, m2=0.5),
+        lambda: GaussianSpot(LAM, F, W, defocus=float("inf")),
+        lambda: AirySpot(LAM, -F, A),
+        lambda: AirySpot(LAM, F, 0.0),
+        lambda: TruncatedGaussianSpot(LAM, F, -W, A),
+        lambda: TruncatedGaussianSpot(float("nan"), F, W, A),
+        lambda: FlatTopSpot(-100e-6),
+    ],
+)
+def test_impossible_beam_parameters_are_rejected(make):
+    with pytest.raises(ValueError):
+        make()
+
+
 def test_diameter_definitions():
     assert gaussian_radius_from_diameter(10e-3, "1/e2") == pytest.approx(5e-3)
     fwhm = 5e-3 * math.sqrt(2 * math.log(2))

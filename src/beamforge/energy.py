@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable
 
-from beamforge.beams import Spot
+from beamforge.beams import Spot, check_positive
 
 # Peak power = k * E / tau, tau = FWHM pulse duration.
 # SPEC.md section 4 quotes the rounded values 0.94, 0.88 and 1.
@@ -21,6 +21,7 @@ def pulse_energy(average_power: float, rep_rate: float) -> float:
 
     Assumes all average power is in the pulse train (no pedestal or ASE).
     """
+    check_positive("rep_rate", rep_rate)
     return average_power / rep_rate
 
 
@@ -46,6 +47,7 @@ def gaussian_aperture_transmission(truncation_ratio: float) -> float:
 
 def peak_fluence(energy: float, a_eff: float) -> float:
     """Peak fluence F0 = E / A_eff (SPEC.md section 4; ISO 21254-1 effective area)."""
+    check_positive("a_eff", a_eff)
     return energy / a_eff
 
 
@@ -85,6 +87,7 @@ def peak_intensity(fluence: float, pulse_duration: float, pulse_shape: str = "ga
     Reference: J.-C. Diels and W. Rudolph, *Ultrashort Laser Pulse Phenomena*,
     2nd ed., table 1.1.
     """
+    check_positive("pulse_duration", pulse_duration)
     try:
         k = PULSE_SHAPE_FACTORS[pulse_shape]
     except KeyError:
@@ -99,6 +102,12 @@ def pulses_per_spot(spot_diameter: float, rep_rate: float, scan_speed: float) ->
 
     d is the spot diameter in whichever definition the caller states.
     """
+    for name, value in (
+        ("spot_diameter", spot_diameter),
+        ("rep_rate", rep_rate),
+        ("scan_speed", scan_speed),
+    ):
+        check_positive(name, value)
     return spot_diameter * rep_rate / scan_speed
 
 
@@ -107,4 +116,10 @@ def pulse_overlap(spot_diameter: float, rep_rate: float, scan_speed: float) -> f
 
     Negative values mean consecutive spots are separated.
     """
+    for name, value in (
+        ("spot_diameter", spot_diameter),
+        ("rep_rate", rep_rate),
+        ("scan_speed", scan_speed),
+    ):
+        check_positive(name, value)
     return 1.0 - scan_speed / (rep_rate * spot_diameter)

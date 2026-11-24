@@ -12,6 +12,7 @@ from beamforge.beams import (
     GaussianSpot,
     Spot,
     TruncatedGaussianSpot,
+    check_positive,
     model_warnings,
 )
 
@@ -47,6 +48,30 @@ class Setup:
     measured: str = "after_aperture"
     transmissions: tuple[float, ...] = ()
     scan_speed: float | None = None
+
+    def __post_init__(self) -> None:
+        """Reject values no real setup can have: zero or negative sizes, NaN, infinity."""
+        for name in (
+            "wavelength",
+            "focal_length",
+            "beam_radius",
+            "aperture_radius",
+            "flat_top_diameter",
+            "rep_rate",
+            "pulse_duration",
+            "scan_speed",
+        ):
+            value = getattr(self, name)
+            if value is not None:
+                check_positive(name, value)
+        for name in ("average_power", "pulse_energy", "target_peak_fluence"):
+            value = getattr(self, name)
+            if value is not None and not (math.isfinite(value) and value >= 0.0):
+                raise ValueError(f"{name} must be zero or a positive number, got {value!r}")
+        if not (math.isfinite(self.m2) and self.m2 >= 1.0):
+            raise ValueError(f"M^2 must be a number of at least 1, got {self.m2!r}")
+        if not math.isfinite(self.defocus):
+            raise ValueError(f"defocus must be a finite number, got {self.defocus!r}")
 
 
 @dataclass(frozen=True)
@@ -166,6 +191,8 @@ def calculate(setup: Setup) -> Result:
         add("transmission_to_target", trans, "", 1.0, "",
             "element transmissions x aperture loss (if measured before aperture)")  # fmt: skip
         if setup.target_peak_fluence is not None:
+            if trans == 0.0:
+                raise ValueError("the transmission to the target is zero, so no energy reaches it")
             energy_on_target = setup.target_peak_fluence * spot.a_eff
             required = energy_on_target / trans
             add("required_pulse_energy", required, "J", 1.0, "J",
@@ -220,7 +247,7 @@ def calculate(setup: Setup) -> Result:
                 f"NA ~ {pupil / setup.focal_length:.2g} is high; the paraxial scalar "
                 "model loses accuracy (vectorial focusing is out of scope)."
             )
-    if math.isfinite(setup.m2) and setup.m2 != 1.0 and setup.model != "gaussian":
+    if setup.m2 != 1.0 and setup.model != "gaussian":
         warnings.append("M^2 is ignored by this model.")
 
     return Result(spot.name, tuple(spot.assumptions), tuple(warnings), tuple(rows))

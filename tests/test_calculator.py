@@ -70,6 +70,35 @@ def test_invalid_setups():
         calculate(Setup(model="donut"))
 
 
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"wavelength": -800e-9},
+        {"focal_length": 0.0},
+        {"beam_radius": float("nan")},
+        {"aperture_radius": -2.5e-3},
+        {"flat_top_diameter": float("inf")},
+        {"rep_rate": -1000.0},
+        {"pulse_duration": 0.0},
+        {"scan_speed": 0.0},
+        {"average_power": -1.0},
+        {"pulse_energy": float("nan")},
+        {"target_peak_fluence": -1.0},
+        {"m2": 0.5},
+        {"m2": float("nan")},
+        {"defocus": float("inf")},
+    ],
+)
+def test_impossible_inputs_are_rejected(change):
+    with pytest.raises(ValueError):
+        Setup(model="truncated_gaussian", **{**OPTICS, **change})
+
+
+def test_reverse_direction_with_no_transmission():
+    with pytest.raises(ValueError, match="zero"):
+        calculate(Setup(model="airy", **OPTICS, target_peak_fluence=1e4, transmissions=(0.0,)))
+
+
 def test_setup_file_units():
     setup = load_setup(EXAMPLE)
     assert setup.model == "truncated_gaussian"
