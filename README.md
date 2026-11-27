@@ -75,9 +75,12 @@ spot size and peak fluence against distance:
 beamforge examples/reference_setup.toml --through-focus through_focus.csv
 ```
 
+The table covers two Rayleigh lengths on each side of best focus; `--focus-range -50 50`
+sets any other range, in mm from best focus.
+
 In the desktop application, **Depth of focus** opens a separate window with the
 same table, plots of spot diameter and peak fluence against distance, and CSV
-export. Far from focus a clipped beam breaks into rings; the FWHM and 1/e²
+export. Its range is automatic or typed in, and is remembered between sessions. Far from focus a clipped beam breaks into rings; the FWHM and 1/e²
 diameters then jump, and where the centre is no longer the brightest point the
 table and plots mark the spot as ring-shaped.
 

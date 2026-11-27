@@ -34,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
+    app.setOrganizationName("BeamForge")
     app.setApplicationName("BeamForge")
     app.setWindowIcon(theme.app_icon())
     # The interface is designed light. Without this, Windows dark mode turns

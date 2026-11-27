@@ -135,6 +135,22 @@ def test_through_focus_table():
     assert build_ratio(setup, half) == pytest.approx(0.5, rel=1e-6)
 
 
+def test_through_focus_any_range():
+    setup = Setup(model="truncated_gaussian", wavelength=LAM, focal_length=F, beam_radius=W,
+                  aperture_radius=A)  # fmt: skip
+    scan = through_focus(setup, points=41, start=-50e-3, stop=50e-3)
+    assert len(scan.distance) == 41
+    assert scan.distance[0] == pytest.approx(-50e-3) and scan.distance[-1] == pytest.approx(50e-3)
+    assert 0.0 in scan.distance
+    assert not scan.centre_is_peak.all()  # rings far from focus
+    beyond = through_focus(setup, points=5, start=5e-3, stop=9e-3)
+    assert beyond.distance == pytest.approx([5e-3, 6e-3, 7e-3, 8e-3, 9e-3])
+    with pytest.raises(ValueError, match="range"):
+        through_focus(setup, start=5e-3, stop=-5e-3)
+    with pytest.raises(ValueError, match="lens"):
+        through_focus(setup, points=5, start=-0.5, stop=0.01)
+
+
 def build_ratio(best, other):
     """Peak fluence of ``other`` relative to ``best`` for the same pulse energy."""
     one = calculate(Setup(**{**best.__dict__, "pulse_energy": 1e-6}))["fluence_peak"].value

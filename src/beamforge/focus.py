@@ -9,7 +9,7 @@ from __future__ import annotations
 import cmath
 import math
 from dataclasses import dataclass
-from functools import cached_property
+from functools import cached_property, lru_cache
 
 import numpy as np
 from scipy import optimize, special
@@ -20,7 +20,7 @@ from beamforge.beams import DIFFRACTION_ASSUMPTIONS, Spot, check_positive
 _X, _W = np.polynomial.legendre.leggauss(600)
 NODES = 0.5 * (_X + 1.0)
 WEIGHTS = 0.5 * _W
-PEAK_GRID_STEP = 0.05  # in the dimensionless radius x
+PEAK_GRID_STEP = 0.2  # first search for an off-axis maximum, in the dimensionless radius x
 
 
 def axial_integral(c: complex) -> complex:
@@ -132,17 +132,21 @@ class FresnelSpot(Spot):
         x_max = max(40.0, 3.0 * abs(self._psi) + 20.0)
         grid = np.arange(0.0, x_max + PEAK_GRID_STEP, PEAK_GRID_STEP)
         values = np.abs(self._g(grid)) ** 2
-        k = int(np.argmax(values))
-        if values[k] <= axis * (1.0 + 1e-9):
+        k = int(np.argmax(values[1:])) + 1  # brightest grid point off the axis
+        if values[k] < 0.95 * axis:
             return axis, 0.0
-        lo, hi = grid[max(k - 1, 0)], grid[min(k + 1, len(grid) - 1)]
+        # A ring may be as bright as the centre: locate its maximum exactly.
+        lo, hi = grid[k - 1], grid[min(k + 1, len(grid) - 1)]
         best = optimize.minimize_scalar(
             lambda x: -(abs(self._g(np.array([x]))[0]) ** 2),
             bounds=(lo, hi),
             method="bounded",
             options={"xatol": 1e-9},
         )
-        return max(-best.fun, values[k]), float(best.x)
+        ring = max(-best.fun, values[k])
+        if ring <= axis * (1.0 + 1e-9):
+            return axis, 0.0
+        return ring, float(best.x) if -best.fun >= values[k] else float(grid[k])
 
     @property
     def centre_is_peak(self) -> bool:
@@ -152,6 +156,25 @@ class FresnelSpot(Spot):
     @property
     def _peak_radius(self) -> float:
         return self._peak[1] * self._scale
+
+    def radius_at_level(self, level: float) -> float:
+        """As :meth:`Spot.radius_at_level`, with the outward steps evaluated in batches.
+
+        Same steps (1/20 of the scale length from the brightest point) and the same
+        first crossing as the base class, refined with Brent's method; evaluating
+        128 radii per call only makes it faster.
+        """
+        if not 0.0 < level < 1.0:
+            raise ValueError("level must be between 0 and 1")
+        step = self._scale / 20.0
+        start = self._peak_radius
+        for batch in range(800):
+            radii = start + step * np.arange(batch * 128 + 1, batch * 128 + 129)
+            below = np.flatnonzero(self.profile(radii) < level)
+            if below.size:
+                hi = float(radii[below[0]])
+                return optimize.brentq(lambda x: float(self.profile(x)) - level, hi - step, hi)
+        raise RuntimeError("profile never falls below the requested level")
 
     def profile(self, rho):
         rho = np.asarray(rho, dtype=float)
@@ -192,6 +215,7 @@ def _pupil_depth(wavelength: float, focal_length: float, radius: float) -> float
     return wavelength * focal_length**2 / (math.pi * radius**2)
 
 
+@lru_cache(maxsize=512)
 def best_focus_distance(
     wavelength: float,
     focal_length: float,

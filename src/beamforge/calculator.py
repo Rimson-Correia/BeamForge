@@ -199,18 +199,35 @@ class FocusScan:
         return self.best_a_eff / self.a_eff
 
 
-def through_focus(setup: Setup, points: int = 61, span: float = 2.0) -> FocusScan:
+def through_focus(
+    setup: Setup,
+    points: int = 101,
+    span: float = 2.0,
+    start: float | None = None,
+    stop: float | None = None,
+) -> FocusScan:
     """The spot of the selected model at distances from best focus.
 
-    Covers ``span`` Rayleigh lengths toward the lens and ``span`` away from it, in
-    ``points`` steps that include best focus. Every point is the spot of the same
+    By default covers ``span`` Rayleigh lengths toward the lens and ``span`` away
+    from it. ``start`` and ``stop`` (m from best focus, negative toward the lens)
+    give any other range instead. ``points`` distances are used, and best focus is
+    one of them when it lies in the range. Every point is the spot of the same
     model with only the target position changed; no new physics is involved.
     """
     offset, toward, away = focus_geometry(setup)
-    half = max(points // 2, 1)
-    distance = np.concatenate(
-        [np.linspace(-span * toward, 0.0, half + 1)[:-1], np.linspace(0.0, span * away, half + 1)]
-    )
+    if start is None and stop is None:
+        start, stop = -span * toward, span * away
+    elif start is None or stop is None or not start < stop:
+        raise ValueError("give both ends of the range, with the start before the stop")
+    if points < 3:
+        raise ValueError("use at least 3 points")
+    if start < 0.0 < stop:
+        left = min(max(round(points * -start / (stop - start)), 1), points - 2)
+        distance = np.concatenate(
+            [np.linspace(start, 0.0, left + 1)[:-1], np.linspace(0.0, stop, points - left)]
+        )
+    else:
+        distance = np.linspace(start, stop, points)
     spots = [build_spot(replace(setup, defocus=float(d))) for d in distance]
     return FocusScan(
         distance=distance,

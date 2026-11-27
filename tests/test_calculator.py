@@ -142,5 +142,5 @@ def test_cli(tmp_path, capsys):
     lines = focus.read_text(encoding="utf-8").splitlines()
     assert lines[0].startswith("distance_from_best_focus_mm")
     assert lines[0].endswith("peak_fluence_j_cm2")
-    assert len(lines) == 62
+    assert len(lines) == 102
     assert lines[0].count(",") == 6

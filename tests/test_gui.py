@@ -109,11 +109,21 @@ def test_depth_of_focus_window(window):
     window.show_focus()
     focus = window.focus_window
     assert focus.isVisible()
-    assert focus.table.rowCount() == 61
+    focus.set_range(None, None)
+    assert focus.table.rowCount() == 101
     expected = calculate(setup_from_dict(example_without_scanning()))
     toward = format_number(expected["rayleigh_length_toward_lens"].display_value)
     assert toward in focus.cards["toward"].value.text()
     assert "J/cm²" in focus.table.horizontalHeaderItem(4).text()
+    focus.set_range(-50, 50)
+    assert focus.scan.distance[0] == pytest.approx(-0.05)
+    assert focus.scan.distance[-1] == pytest.approx(0.05)
+    assert 0.0 in focus.scan.distance
+    assert focus.message.isHidden() or "ring" in focus.message.text()
+    focus.set_range(10, -10)
+    assert "smaller" in focus.message.text()
+    assert focus.table.rowCount() == 0
+    focus.set_range(None, None)
     select(window, "flat_top")
     assert not focus.message.isHidden()
     assert focus.table.rowCount() == 0

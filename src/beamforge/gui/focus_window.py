@@ -9,10 +9,11 @@ from html import escape
 
 import numpy as np
 import pyqtgraph as pg
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QDialog,
     QFileDialog,
     QHBoxLayout,
@@ -30,9 +31,11 @@ from PySide6.QtWidgets import (
 from beamforge.calculator import FocusScan, Quantity, Result, Setup, through_focus
 from beamforge.cli import write_focus_csv
 from beamforge.gui import theme
+from beamforge.gui.inputs import NumberEdit
 from beamforge.gui.widgets import Card, format_number
 
 GREEN = "#059669"
+POINTS = 101
 
 
 def _length(name: str, value: float, definition: str) -> Quantity:
@@ -52,6 +55,7 @@ class FocusWindow(QDialog):
         self.setObjectName("root")
         self.scan: FocusScan | None = None
         self.energy: float | None = None
+        self.last: tuple[Setup, Result] | None = None
 
         column = QVBoxLayout(self)
         column.setContentsMargins(14, 12, 14, 12)
@@ -86,6 +90,32 @@ class FocusWindow(QDialog):
         for card in self.cards.values():
             cards.addWidget(card)
         column.addLayout(cards)
+
+        settings = QSettings()
+        range_row = QHBoxLayout()
+        range_row.setSpacing(8)
+        self.auto_range = QCheckBox("Automatic range (±2 Rayleigh lengths)")
+        self.auto_range.setChecked(settings.value("focus/auto", True, type=bool))
+        self.range_start = NumberEdit(str(settings.value("focus/start_mm", "-50")), positive=False)
+        self.range_stop = NumberEdit(str(settings.value("focus/stop_mm", "50")), positive=False)
+        range_row.addWidget(self.auto_range)
+        range_row.addSpacing(18)
+        self.range_labels = [QLabel("or from"), QLabel("to"), QLabel("mm from best focus")]
+        for widget in (
+            self.range_labels[0],
+            self.range_start,
+            self.range_labels[1],
+            self.range_stop,
+            self.range_labels[2],
+        ):
+            range_row.addWidget(widget)
+        for edit in (self.range_start, self.range_stop):
+            edit.setFixedWidth(90)
+            edit.editingFinished.connect(self._range_edited)
+        self.auto_range.toggled.connect(self._range_edited)
+        range_row.addStretch(1)
+        column.addLayout(range_row)
+        self._enable_range_fields()
 
         plots = QWidget()
         row = QHBoxLayout(plots)
@@ -156,8 +186,45 @@ class FocusWindow(QDialog):
 
     # -- update ---------------------------------------------------------------
 
+    def _enable_range_fields(self) -> None:
+        manual = not self.auto_range.isChecked()
+        for widget in (self.range_start, self.range_stop, *self.range_labels):
+            widget.setEnabled(manual)
+
+    def _range_edited(self, *_args) -> None:
+        """The user changed the range: remember it for next time and redraw."""
+        settings = QSettings()
+        settings.setValue("focus/auto", self.auto_range.isChecked())
+        settings.setValue("focus/start_mm", self.range_start.text())
+        settings.setValue("focus/stop_mm", self.range_stop.text())
+        self._enable_range_fields()
+        if self.last is not None:
+            self.refresh(*self.last)
+
+    def set_range(self, start_mm: float | None, stop_mm: float | None) -> None:
+        """Show a given range in mm from best focus, or the automatic one for None."""
+        automatic = start_mm is None or stop_mm is None
+        blocked = self.auto_range.blockSignals(True)
+        self.auto_range.setChecked(automatic)
+        self.auto_range.blockSignals(blocked)
+        if not automatic:
+            self.range_start.setText(f"{start_mm:g}")
+            self.range_stop.setText(f"{stop_mm:g}")
+        self._enable_range_fields()
+        if self.last is not None:
+            self.refresh(*self.last)
+
+    def _scan(self, setup: Setup) -> FocusScan:
+        if self.auto_range.isChecked():
+            return through_focus(setup, points=POINTS)
+        start, stop = self.range_start.value(), self.range_stop.value()
+        if start is None or stop is None or not start < stop:
+            raise ValueError("Enter a range whose start is smaller than its end, in mm.")
+        return through_focus(setup, points=POINTS, start=start * 1e-3, stop=stop * 1e-3)
+
     def refresh(self, setup: Setup, result: Result) -> None:
         """Recompute the through-focus table for the main window's current setup."""
+        self.last = (setup, result)
         if setup.model == "flat_top":
             self._unavailable(
                 "The flat-top model describes a spot of given size on the target and has no "
@@ -166,7 +233,7 @@ class FocusWindow(QDialog):
             return
         QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
-            scan = through_focus(setup)
+            scan = self._scan(setup)
         except (ValueError, RuntimeError) as error:
             self._unavailable(str(error))
             return
@@ -241,12 +308,14 @@ class FocusWindow(QDialog):
                 )
                 plot.addItem(region)
                 self.markers.append((plot, region))
-            for x, label, pen in (
-                (-scan.rayleigh_toward_lens * 1e3, "−Rayleigh", rayleigh),
-                (scan.rayleigh_away_from_lens * 1e3, "+Rayleigh", rayleigh),
-                (target * 1e3, "target", target_pen),
+            for x, label, pen, height in (
+                (-scan.rayleigh_toward_lens * 1e3, "−Rayleigh", rayleigh, 0.92),
+                (scan.rayleigh_away_from_lens * 1e3, "+Rayleigh", rayleigh, 0.92),
+                (target * 1e3, "target", target_pen, 0.08),
             ):
-                line = pg.InfiniteLine(pos=x, angle=90, pen=pen, label=label, labelOpts=options)
+                line = pg.InfiniteLine(
+                    pos=x, angle=90, pen=pen, label=label, labelOpts={**options, "position": height}
+                )
                 plot.addItem(line)
                 self.markers.append((plot, line))
             plot.getPlotItem().setXRange(mm[0], mm[-1], padding=0.02)

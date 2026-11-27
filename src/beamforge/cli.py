@@ -1,4 +1,4 @@
-"""Command-line interface: ``beamforge setup.toml [--csv results.csv] [--through-focus f.csv]``."""
+"""Command-line interface: ``beamforge setup.toml [--csv f.csv] [--through-focus f.csv]``."""
 
 from __future__ import annotations
 
@@ -83,6 +83,13 @@ def main(argv: list[str] | None = None) -> int:
         metavar="CSV",
         help="also write spot size and peak fluence against distance from best focus",
     )
+    parser.add_argument(
+        "--focus-range",
+        nargs=2,
+        type=float,
+        metavar=("FROM_MM", "TO_MM"),
+        help="range of --through-focus in mm from best focus (default: 2 Rayleigh lengths)",
+    )
     args = parser.parse_args(argv)
     try:
         setup = load_setup(args.setup)
@@ -95,7 +102,8 @@ def main(argv: list[str] | None = None) -> int:
         write_csv(args.csv, result)
     if args.through_focus:
         try:
-            scan = through_focus(setup)
+            limits = [v * 1e-3 for v in args.focus_range] if args.focus_range else [None, None]
+            scan = through_focus(setup, start=limits[0], stop=limits[1])
         except ValueError as error:
             print(f"error: {error}", file=sys.stderr)
             return 1
